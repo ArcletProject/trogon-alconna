@@ -80,7 +80,7 @@ class CommandBuilder(Screen):
         self.highlighter = ReprHighlighter()
 
     def compose(self) -> ComposeResult:
-        # tree = CommandTree("Commands", self.command_schemas, self.command_name)
+        tree = CommandTree("Commands", self.command_schemas, self.command_name)
 
         title_parts = [Text(self.app_name, style="b")]
         if self.version:
@@ -89,11 +89,11 @@ class CommandBuilder(Screen):
 
         title = Text.assemble(*title_parts)
 
-        # sidebar = Vertical(
-        #     Label(title, id="home-commands-label"),
-        #     tree,
-        #     id="home-sidebar",
-        # )
+        sidebar = Vertical(
+            Label(title, id="home-commands-label"),
+            tree,
+            id="home-sidebar",
+        )
         # if self.is_grouped_cli:
         #     # If the root of the click app is a Group instance, then
         #     #  we display the command tree to users and focus it.
@@ -101,9 +101,9 @@ class CommandBuilder(Screen):
         # else:
         #     # If the click app is structured using a single command,
         #     #  there's no need for us to display the command tree.
-        #     sidebar.display = False
+        sidebar.display = False
 
-        # yield sidebar
+        yield sidebar
 
         with Vertical(id="home-body"):
             with Horizontal(id="home-command-description-container") as vs:

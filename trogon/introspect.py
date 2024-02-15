@@ -230,7 +230,7 @@ def introspect_click_app(alc: Alconna) -> dict[CommandName, CommandSchema]:
 
     data: dict[CommandName, CommandSchema] = {}
 
-    cmd_name = CommandName(alc.path)
+    cmd_name = CommandName(f"{alc.namespace}_{alc.name}")
     data[cmd_name] = process_command(cmd_name, alc)
 
     return data

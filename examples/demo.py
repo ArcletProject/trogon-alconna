@@ -1,8 +1,9 @@
 from trogon import tui
-from arclet.alconna import Alconna, CommandMeta
+from arclet.alconna import Alconna, CommandMeta, Args
 
 alc = Alconna(
     "trogon",
+    Args["foo?", str],
     meta=CommandMeta(
         description="A CLI framework for Arclet",
         usage="trogon [command] [options] [arguments]",
