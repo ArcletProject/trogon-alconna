@@ -2,3 +2,6 @@
 .vscode
 .DS_store
 dist/*
+.pdm-python
+.venv
+.pdm-build
