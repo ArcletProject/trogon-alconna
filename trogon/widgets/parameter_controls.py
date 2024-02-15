@@ -3,8 +3,8 @@ from __future__ import annotations
 import functools
 from functools import partial
 from typing import Any, Callable, Iterable, TypeVar, Union, cast
+from typing_extensions import TypeAlias
 
-import click
 from rich.text import Text
 from textual import log, on
 from textual.app import ComposeResult
@@ -21,10 +21,10 @@ from textual.widgets import (
     Button,
 )
 
-from trogon.introspect import ArgumentSchema, OptionSchema, MultiValueParamData
+from trogon.introspect import ArgumentSchema, OptionSchema
 from trogon.widgets.multiple_choice import MultipleChoice
 
-ControlWidgetType: TypeVar = Union[Input, Checkbox, MultipleChoice, Select]
+ControlWidgetType: TypeAlias = Union[Input, Checkbox, MultipleChoice, Select]
 
 
 class ControlGroup(Vertical):

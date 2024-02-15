@@ -13,7 +13,8 @@ from trogon.introspect import (
     CommandName,
     OptionSchema,
     ArgumentSchema,
-    MultiValueParamData,
+    KeyWordArgumentSchema,
+    MultiVarArgumentSchema
 )
 from trogon.widgets.parameter_controls import ValueNotSupplied
 
@@ -53,7 +54,7 @@ class UserArgumentData:
     """
 
     name: str
-    value: tuple[Any]
+    value: Any
     argument_schema: ArgumentSchema
 
 
@@ -88,7 +89,7 @@ class UserCommandData:
         if not include_root_command:
             cli_args = cli_args[1:]
 
-        return cli_args
+        return cli_args  # type: ignore
 
     def _to_cli_args(self):
         args = [self.name]

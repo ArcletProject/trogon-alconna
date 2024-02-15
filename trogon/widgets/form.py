@@ -97,6 +97,8 @@ class CommandForm(Widget):
         self.first_control: ParameterControls | None = None
 
     def compose(self) -> ComposeResult:
+        if self.command_schema is None:
+            return
         path_from_root = iter(reversed(self.command_schema.path_from_root))
         command_node = next(path_from_root)
         with VerticalScroll() as vs:
@@ -159,6 +161,10 @@ class CommandForm(Widget):
         then post a FormChanged message"""
 
         command_schema = self.command_schema
+
+        if command_schema is None:
+            return
+
         path_from_root = command_schema.path_from_root
 
         # Sentinel root value to make constructing the tree a little easier.
@@ -206,8 +212,10 @@ class CommandForm(Widget):
 
         # Trim the sentinel
         root_command_data = root_command_data.subcommand
-        root_command_data.parent = None
-        self.post_message(self.Changed(root_command_data))
+
+        if root_command_data is not None:
+            root_command_data.parent = None
+            self.post_message(self.Changed(root_command_data))
 
     def focus(self, scroll_visible: bool = True):
         if self.first_control is not None:

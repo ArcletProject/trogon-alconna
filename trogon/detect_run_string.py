@@ -46,7 +46,7 @@ def detect_run_string(path=None, _main=sys.modules["__main__"]) -> str:
     # Executed a module, like "python -m example".
     # Rewritten by Python from "-m script" to "/path/to/script.py".
     # Need to look at main module to determine how it was executed.
-    py_module = _main.__package__
+    py_module = _main.__package__ or _main.__name__
     name = os.path.splitext(os.path.basename(path))[0]
 
     # A submodule like "example.cli".

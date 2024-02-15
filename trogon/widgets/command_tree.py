@@ -36,11 +36,11 @@ class CommandTree(Tree[CommandSchema]):
                     continue
                 if cmd_data.subcommands:
                     label = Text(cmd_name)
-                    if cmd_data.is_group:
-                        group_style = self.get_component_rich_style("group")
-                        label.stylize(group_style)
-                        label.append(" ")
-                        label.append("group", "dim i")
+                    # if cmd_data.is_group:
+                    #     group_style = self.get_component_rich_style("group")
+                    #     label.stylize(group_style)
+                    #     label.append(" ")
+                    #     label.append("group", "dim i")
                     child = node.add(label, allow_expand=False, data=cmd_data)
                     build_tree(cmd_data.subcommands, child)
                 else:

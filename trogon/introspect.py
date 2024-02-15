@@ -4,81 +4,89 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence, NewType
 
-import click
-from click import BaseCommand, ParamType
+# import click
+# from click import BaseCommand, ParamType
+from arclet.alconna import Alconna, Option, Subcommand, Args, Field, MultiVar, KeyWordVar, OptionResult, SubcommandResult
+from arclet.alconna.action import Action, store, ActType
+from nepattern import BasePattern
 
 
-def generate_unique_id():
-    return f"id_{str(uuid.uuid4())[:8]}"
-
-
-@dataclass
-class MultiValueParamData:
-    values: list[tuple[int | float | str]]
-
-    @staticmethod
-    def process_cli_option(value) -> "MultiValueParamData":
-        if value is None:
-            value = MultiValueParamData([])
-        elif isinstance(value, tuple):
-            value = MultiValueParamData([value])
-        elif isinstance(value, list):
-            processed_list = [
-                (item,) if not isinstance(item, tuple) else item for item in value
-            ]
-            value = MultiValueParamData(processed_list)
-        else:
-            value = MultiValueParamData([(value,)])
-
-        return value
-
-
-@dataclass
-class OptionSchema:
-    name: list[str]
-    type: ParamType
-    default: MultiValueParamData | None = None
-    required: bool = False
-    is_flag: bool = False
-    is_boolean_flag: bool = False
-    flag_value: Any = ""
-    opts: list = field(default_factory=list)
-    counting: bool = False
-    secondary_opts: list = field(default_factory=list)
-    key: str | tuple[str] = field(default_factory=generate_unique_id)
-    help: str | None = None
-    choices: Sequence[str] | None = None
-    multiple: bool = False
-    multi_value: bool = False
-    nargs: int = 1
-
-    def __post_init__(self):
-        self.multi_value = isinstance(self.type, click.Tuple)
 
 
 @dataclass
 class ArgumentSchema:
     name: str
-    type: str
-    required: bool = False
-    key: str = field(default_factory=generate_unique_id)
-    default: MultiValueParamData | None = None
-    choices: Sequence[str] | None = None
-    multiple: bool = False
-    nargs: int = 1
+    type: BasePattern
+    field: Field
+    parent: "OptionSchema | CommandSchema"
+    notice: str | None = None
+    optional: bool = False
+
+    @property
+    def key(self):
+        return f"{self.parent.key}_{self.name}"
+
+@dataclass
+class KeyWordArgumentSchema(ArgumentSchema):
+    sep: str = "="
+
+@dataclass
+class MultiVarArgumentSchema(ArgumentSchema):
+    nargs: int | str = "+"
+    keyword: bool = False
+
+
+@dataclass
+class OptionSchema:
+    name: str
+    aliases: list[str]
+    arguments: list[ArgumentSchema]
+    description: str
+    dest: str
+    parent: "CommandSchema"
+    action: Action = store
+    default: OptionResult | None = None
+
+    @property
+    def key(self):
+        return f"{self.parent.key}_{self.name}"
+
+    @property
+    def action_str(self):
+        if self.action is store:
+            return None
+        if self.action.type is ActType.APPEND:
+            return f"append({self.action.value})"
+        if self.action.type is ActType.COUNT:
+            return "count"
+        if self.action.type is ActType.STORE:
+            if self.action.value is True:
+                return "store_true"
+            if self.action.value is False:
+                return "store_false"
+            return f"store({self.action.value})"
+
 
 
 @dataclass
 class CommandSchema:
     name: CommandName
-    function: Callable[..., Any | None]
-    key: str = field(default_factory=generate_unique_id)
-    docstring: str | None = None
+    command: str
+    functions: list[Callable[..., Any | None]]
+    description: str | None = None
+    usage: str | None = None
+    example: str | None = None
     options: list[OptionSchema] = field(default_factory=list)
     arguments: list[ArgumentSchema] = field(default_factory=list)
     subcommands: dict["CommandName", "CommandSchema"] = field(default_factory=dict)
+    default: SubcommandResult | None = None
     parent: "CommandSchema | None" = None
-    is_group: bool = False
+
+    @property
+    def key(self):
+        if self.parent is None:
+            return self.name
+        return f"{self.parent.key}_{self.name}"
 
     @property
     def path_from_root(self) -> list["CommandSchema"]:
@@ -88,13 +96,14 @@ class CommandSchema:
             node = node.parent
             if node is None:
                 break
-            path.append(node)
+            path.append(node)  # type: ignore
         return list(reversed(path))
 
 
-def introspect_click_app(app: BaseCommand) -> dict[CommandName, CommandSchema]:
+
+def introspect_click_app(alc: Alconna) -> dict[CommandName, CommandSchema]:
     """
-    Introspect a Click application and build a data structure containing
+    Introspect a Alconna instance and build a data structure containing
     information about all commands, options, arguments, and subcommands,
     including the docstrings and command function references.
 
@@ -104,86 +113,125 @@ def introspect_click_app(app: BaseCommand) -> dict[CommandName, CommandSchema]:
     command function references.
 
     Args:
-        app (click.BaseCommand): The Click application's top-level group or command instance.
+        alc (arclet.alconna.core.Alconna): The command instance.
 
     Returns:
-        Dict[str, CommandData]: A nested dictionary containing the Click application's
+        Dict[str, CommandData]: A nested dictionary containing the Alconna instance's
         structure. The structure is defined by the CommandData TypedDict and its related
         TypedDicts (OptionData and ArgumentData).
     """
 
     def process_command(
-        cmd_name: CommandName, cmd_obj: click.Command, parent=None
+        cmd_name: CommandName, cmd_obj: Alconna
     ) -> CommandSchema:
         cmd_data = CommandSchema(
             name=cmd_name,
-            docstring=cmd_obj.help,
-            function=cmd_obj.callback,
+            command=cmd_obj.header_display,
+            functions=list(cmd_obj._executors),
+            description=cmd_obj.meta.description,
+            usage=cmd_obj.meta.usage,
+            example=cmd_obj.meta.example,
             options=[],
             arguments=[],
             subcommands={},
-            parent=parent,
-            is_group=isinstance(cmd_obj, click.Group),
         )
 
-        for param in cmd_obj.params:
-            default = MultiValueParamData.process_cli_option(param.default)
-            if isinstance(param, (click.Option, click.core.Group)):
-                option_data = OptionSchema(
-                    name=param.opts,
-                    type=param.type,
-                    is_flag=param.is_flag,
-                    is_boolean_flag=param.is_bool_flag,
-                    flag_value=param.flag_value,
-                    counting=param.count,
-                    opts=param.opts,
-                    secondary_opts=param.secondary_opts,
-                    required=param.required,
-                    default=default,
-                    help=param.help,
-                    multiple=param.multiple,
-                    nargs=param.nargs,
-                )
-                if isinstance(param.type, click.Choice):
-                    option_data.choices = param.type.choices
-                cmd_data.options.append(option_data)
-            elif isinstance(param, click.Argument):
-                argument_data = ArgumentSchema(
-                    name=param.name,
-                    type=param.type,
-                    required=param.required,
-                    multiple=param.multiple,
-                    default=default,
-                    nargs=param.nargs,
-                )
-                if isinstance(param.type, click.Choice):
-                    argument_data.choices = param.type.choices
-                cmd_data.arguments.append(argument_data)
+        def process_args(args: Args, parent: OptionSchema | CommandSchema):
+            for arg in args:
+                if isinstance(arg.value, KeyWordVar):
+                    parent.arguments.append(
+                        KeyWordArgumentSchema(
+                            name=arg.name,
+                            type=arg.value.base,
+                            field=arg.field,
+                            parent=parent,
+                            notice=arg.notice,
+                            optional=arg.optional,
+                            sep=arg.value.sep,
+                        )
+                    )
+                elif isinstance(arg.value, MultiVar):
+                    parent.arguments.append(
+                        MultiVarArgumentSchema(
+                            name=arg.name,
+                            type=arg.value.base.base,
+                            field=arg.field,
+                            parent=parent,
+                            notice=arg.notice,
+                            optional=arg.optional,
+                            nargs=arg.value.flag,
+                            keyword=True,
+                        ) if isinstance(arg.value.base, KeyWordVar) else MultiVarArgumentSchema(
+                            name=arg.name,
+                            type=arg.value.base,
+                            field=arg.field,
+                            parent=parent,
+                            notice=arg.notice,
+                            optional=arg.optional,
+                            nargs=arg.value.flag,
+                        )
+                    )
+                else:
+                    parent.arguments.append(
+                        ArgumentSchema(
+                            name=arg.name,
+                            type=arg.value,
+                            parent=parent,
+                            field=arg.field,
+                            notice=arg.notice,
+                            optional=arg.optional,
+                        )
+                    )
 
-        if isinstance(cmd_obj, click.core.Group):
-            for subcmd_name, subcmd_obj in cmd_obj.commands.items():
-                cmd_data.subcommands[CommandName(subcmd_name)] = process_command(
-                    CommandName(subcmd_name), subcmd_obj, parent=cmd_data
+        process_args(cmd_obj.args, cmd_data)
+
+        def process_option(option: Option, parent: CommandSchema):
+            parent.options.append(
+                OptionSchema(
+                    name=option.name,
+                    aliases=list(option.aliases),
+                    arguments=[],
+                    parent=parent,
+                    description=option.help_text,
+                    dest=option.dest,
+                    action=option.action,
+                    default=option.default,
                 )
+            )
+            process_args(option.args, parent.options[-1])
+
+        def process_subcommand(subcommand: Subcommand, parent: CommandSchema):
+            subcommand_name = CommandName(subcommand.name)
+            parent.subcommands[subcommand_name] = CommandSchema(
+                name=subcommand_name,
+                command=subcommand_name,
+                functions=[],
+                description=subcommand.help_text,
+                options=[],
+                arguments=[],
+                subcommands={},
+                default=subcommand.default,
+                parent=parent,
+            )
+            process_args(subcommand.args, parent.subcommands[subcommand_name])
+            for opt in subcommand.options:
+                if isinstance(opt, Subcommand):
+                    process_subcommand(opt, parent.subcommands[subcommand_name])
+                else:
+                    process_option(opt, parent.subcommands[subcommand_name])
+
+        for opt in cmd_obj.options:
+            if isinstance(opt, Subcommand):
+                process_subcommand(opt, cmd_data)
+            else:
+                process_option(opt, cmd_data)
 
         return cmd_data
 
     data: dict[CommandName, CommandSchema] = {}
 
-    # Special case for the root group
-    if isinstance(app, click.Group):
-        root_cmd_name = CommandName("root")
-        data[root_cmd_name] = process_command(root_cmd_name, app)
-        app = data[root_cmd_name]
-
-    if isinstance(app, click.Group):
-        for cmd_name, cmd_obj in app.commands.items():
-            data[CommandName(cmd_name)] = process_command(
-                CommandName(cmd_name), cmd_obj
-            )
-    elif isinstance(app, click.Command):
-        cmd_name = CommandName(app.name)
-        data[cmd_name] = process_command(cmd_name, app)
+    cmd_name = CommandName(alc.path)
+    data[cmd_name] = process_command(cmd_name, alc)
 
     return data
 

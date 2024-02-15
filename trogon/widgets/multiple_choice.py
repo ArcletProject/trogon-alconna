@@ -49,7 +49,7 @@ class MultipleChoice(Widget):
     ):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         if defaults is None:
-            defaults = [()]
+            defaults = [tuple()]
         self.options = options
         self.defaults = defaults
         self.selected = defaults

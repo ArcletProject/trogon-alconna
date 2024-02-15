@@ -38,12 +38,7 @@ class CommandMetadata(DataTable):
         self.add_rows(
             [
                 (Text("Name", style="b"), schema.name),
-                (
-                    Text("Parent", style="b"),
-                    getattr(schema.parent, "name", "No parent"),
-                ),
                 (Text("Subcommands", style="b"), list(schema.subcommands.keys())),
-                (Text("Group", style="b"), schema.is_group),
                 (Text("Arguments", style="b"), len(schema.arguments)),
                 (Text("Options", style="b"), len(schema.options)),
             ]
@@ -91,8 +86,8 @@ class CommandInfo(ModalScreen):
                 yield tabs
 
             command_info = (
-                self.command_schema.docstring.strip()
-                if self.command_schema.docstring
+                self.command_schema.description.strip()
+                if self.command_schema.description
                 else "No description available"
             )
 
